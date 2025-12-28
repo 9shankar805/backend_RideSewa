@@ -134,7 +134,7 @@ app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), asyncH
   }
 }));
 
-// Create ride request with maps integration
+// Create ride request with contact info
 app.post('/api/rides', authenticateToken, rideLimiter, validateRequest(schemas.createRide), asyncHandler(async (req, res) => {
   try {
     // Calculate route and fare
@@ -150,7 +150,11 @@ app.post('/api/rides', authenticateToken, rideLimiter, validateRequest(schemas.c
       passenger_id: req.user.id,
       distance_km: routeInfo.distance,
       estimated_duration_minutes: routeInfo.duration,
-      estimated_fare: estimatedFare
+      estimated_fare: estimatedFare,
+      // Add contact info for other person rides
+      contact_name: req.body.contact_name || null,
+      contact_phone: req.body.contact_phone || null,
+      is_for_other: req.body.is_for_other || false
     };
     
     const result = await rideMatchingService.createRideRequest(rideData);
