@@ -4,9 +4,9 @@
   "description": "Professional InDrive Clone Backend API with Real-time Features",
   "main": "server-deploy.js",
   "scripts": {
-    "start": "npm run migrate && node server-deploy.js",
+    "start": "node run-migration.js && node server-deploy.js",
     "dev": "node server.js",
-    "migrate": "node migrate.js",
+    "migrate": "node run-migration.js",
     "build": "npm install",
     "test": "jest",
     "lint": "eslint ."
