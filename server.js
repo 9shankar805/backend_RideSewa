@@ -134,6 +134,9 @@ app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), asyncH
   }
 }));
 
+// Store created rides in memory for testing
+const activeRides = new Map();
+
 // Create ride request with contact info (no auth required for testing)
 app.post('/api/rides', rideLimiter, asyncHandler(async (req, res) => {
   try {
@@ -144,15 +147,20 @@ app.post('/api/rides', rideLimiter, asyncHandler(async (req, res) => {
       created_at: new Date()
     };
     
-    // Mock ride creation
     const rideId = 'ride_' + Date.now();
+    const ride = { 
+      id: rideId,
+      ...rideData
+    };
+    
+    // Store ride in memory
+    activeRides.set(rideId, ride);
+    
+    console.log('✅ Ride created and stored:', rideId);
     
     res.json({ 
       success: true, 
-      ride: { 
-        id: rideId,
-        ...rideData
-      }
+      ride
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -242,8 +250,13 @@ app.post('/api/drivers/status', async (req, res) => {
 // Get available rides for drivers
 app.get('/api/rides/available', async (req, res) => {
   try {
-    const result = await query("SELECT * FROM rides WHERE status = 'searching' ORDER BY created_at DESC");
-    res.json(result.rows);
+    // Return rides from memory that are searching
+    const availableRides = Array.from(activeRides.values())
+      .filter(ride => ride.status === 'searching')
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    console.log('🚗 Available rides requested, found:', availableRides.length);
+    res.json(availableRides);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1104,7 +1117,15 @@ app.get('/api/rides/:rideId/bids', asyncHandler(async (req, res) => {
 app.get('/api/rides/:rideId', asyncHandler(async (req, res) => {
   try {
     const { rideId } = req.params;
-    // Mock ride details
+    
+    // Get ride from memory first
+    const ride = activeRides.get(rideId);
+    if (ride) {
+      res.json(ride);
+      return;
+    }
+    
+    // Fallback to mock data
     const mockRide = {
       id: rideId,
       status: 'searching',
