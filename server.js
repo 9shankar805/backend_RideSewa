@@ -1119,7 +1119,7 @@ app.get('/api/rides/:rideId', asyncHandler(async (req, res) => {
   }
 }));
 
-// Wallet endpoint
+// Wallet endpoint (no auth for testing)
 app.get('/api/wallet', asyncHandler(async (req, res) => {
   try {
     res.json({ balance: 500, transactions: [] });
@@ -1185,6 +1185,14 @@ app.post('/api/migrate', asyncHandler(async (req, res) => {
     // Add full_name column to users table
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255);`);
     console.log('✅ Added full_name column to users');
+    
+    // Add user_type column to users table
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) DEFAULT 'passenger';`);
+    console.log('✅ Added user_type column to users');
+    
+    // Add phone_number column to users table
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);`);
+    console.log('✅ Added phone_number column to users');
     
     // Create driver_profiles table
     await query(`
