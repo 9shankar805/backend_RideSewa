@@ -36,6 +36,12 @@ const { User, DriverProfile, Ride, Bid, Notification } = require('./database/mod
 const RealTimeService = require('./services/realTimeService');
 const RideMatchingService = require('./services/rideMatchingService');
 
+// Import routes
+const authRoutes = require('./routes/auth');
+const mapsRoutes = require('./routes/maps');
+const paymentsRoutes = require('./routes/payments');
+const safetyRoutes = require('./routes/safety');
+
 const app = express();
 const server = http.createServer(app);
 
@@ -74,6 +80,12 @@ app.use(requestLogger);
 app.use('/api/auth', authLimiter);
 app.use('/api/auth/login', bruteForce.prevent);
 app.use('/api', apiLimiter);
+
+// Mount routes
+app.use('/api/auth', authRoutes);
+app.use('/api', mapsRoutes);
+app.use('/api', paymentsRoutes);
+app.use('/api', safetyRoutes);
 
 // Test database connection on startup
 testConnection();
