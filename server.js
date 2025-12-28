@@ -480,8 +480,8 @@ app.post('/api/maps/reverse-geocode', authenticateToken, asyncHandler(async (req
 // Update driver location
 app.post('/api/drivers/location', async (req, res) => {
   try {
-    const { userId, latitude, longitude } = req.body;
-    await DriverProfile.updateLocation(userId, latitude, longitude);
+    const { latitude, longitude, heading } = req.body;
+    console.log('🚗 Driver location update:', { latitude, longitude });
     res.json({ success: true });
   } catch (error) {
     res.status(400).json({ error: error.message });
