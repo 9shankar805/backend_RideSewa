@@ -2,7 +2,7 @@
   "name": "indrive-backend",
   "version": "1.0.0",
   "description": "Professional InDrive Clone Backend API with Real-time Features",
-  "main": "server.js",
+  "main": "server-deploy.js",
   "scripts": {
     "start": "node server-deploy.js",
     "dev": "node server.js",
