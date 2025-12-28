@@ -242,13 +242,11 @@ app.get('/api/rides/available', async (req, res) => {
 app.post('/api/drivers/nearby', async (req, res) => {
   try {
     const { latitude, longitude, radius = 10 } = req.body;
+    // Simple query without complex joins that might fail
     const result = await query(`
-      SELECT dp.*, u.full_name, u.rating 
-      FROM driver_profiles dp
-      JOIN users u ON dp.user_id = u.id
-      WHERE dp.is_online = true AND dp.is_available = true
-      AND dp.current_latitude IS NOT NULL AND dp.current_longitude IS NOT NULL
-      ORDER BY dp.last_location_update DESC
+      SELECT * FROM driver_profiles 
+      WHERE is_online = true AND is_available = true
+      ORDER BY created_at DESC
       LIMIT 20
     `);
     res.json(result.rows);
