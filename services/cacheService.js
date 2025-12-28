@@ -3,25 +3,36 @@ const logger = require('./loggerService');
 
 class CacheService {
   constructor() {
-    this.redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      password: process.env.REDIS_PASSWORD,
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true
-    });
+    try {
+      this.redis = new Redis({
+        host: process.env.REDIS_HOST || 'localhost',
+        port: process.env.REDIS_PORT || 6379,
+        password: process.env.REDIS_PASSWORD,
+        retryDelayOnFailover: 100,
+        maxRetriesPerRequest: 3,
+        lazyConnect: true,
+        connectTimeout: 5000
+      });
 
-    this.redis.on('connect', () => {
-      logger.info('Redis connected successfully');
-    });
+      this.redis.on('connect', () => {
+        logger.info('Redis connected successfully');
+        this.isConnected = true;
+      });
 
-    this.redis.on('error', (err) => {
-      logger.error('Redis connection error', err);
-    });
+      this.redis.on('error', (err) => {
+        logger.error('Redis connection error', err);
+        this.isConnected = false;
+      });
+      
+      this.isConnected = false;
+    } catch (error) {
+      console.log('⚠️  Redis not available - caching disabled');
+      this.isConnected = false;
+    }
   }
 
   async get(key) {
+    if (!this.isConnected) return null;
     try {
       const value = await this.redis.get(key);
       return value ? JSON.parse(value) : null;
@@ -32,6 +43,7 @@ class CacheService {
   }
 
   async set(key, value, ttl = 3600) {
+    if (!this.isConnected) return false;
     try {
       await this.redis.setex(key, ttl, JSON.stringify(value));
       return true;

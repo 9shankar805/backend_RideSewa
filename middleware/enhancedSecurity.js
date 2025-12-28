@@ -37,31 +37,48 @@ const createAdvancedRateLimit = (windowMs, max, message, skipSuccessfulRequests 
   });
 };
 
-// Brute Force Protection
-const bruteForceStore = new RedisStore({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD
-});
-
-const bruteForce = new ExpressBrute(bruteForceStore, {
-  freeRetries: 5,
-  minWait: 5 * 60 * 1000, // 5 minutes
-  maxWait: 60 * 60 * 1000, // 1 hour
-  lifetime: 24 * 60 * 60, // 24 hours
-  failCallback: (req, res, next, nextValidRequestDate) => {
-    logger.warn('Brute force attack detected', {
-      ip: req.ip,
-      endpoint: req.originalUrl,
-      nextValidRequest: nextValidRequestDate
-    });
-    
-    res.status(429).json({
-      error: 'Too many failed attempts',
-      nextValidRequestDate
-    });
-  }
-});
+// Brute Force Protection - make Redis optional
+let bruteForce;
+try {
+  const bruteForceStore = new RedisStore({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD
+  });
+  
+  bruteForce = new ExpressBrute(bruteForceStore, {
+    freeRetries: 5,
+    minWait: 5 * 60 * 1000, // 5 minutes
+    maxWait: 60 * 60 * 1000, // 1 hour
+    lifetime: 24 * 60 * 60, // 24 hours
+    failCallback: (req, res, next, nextValidRequestDate) => {
+      logger.warn('Brute force attack detected', {
+        ip: req.ip,
+        endpoint: req.originalUrl,
+        nextValidRequest: nextValidRequestDate
+      });
+      
+      res.status(429).json({
+        error: 'Too many failed attempts',
+        nextValidRequestDate
+      });
+    }
+  });
+} catch (error) {
+  console.log('⚠️  Redis not available - using memory store for brute force protection');
+  bruteForce = new ExpressBrute(new ExpressBrute.MemoryStore(), {
+    freeRetries: 5,
+    minWait: 5 * 60 * 1000,
+    maxWait: 60 * 60 * 1000,
+    lifetime: 24 * 60 * 60,
+    failCallback: (req, res, next, nextValidRequestDate) => {
+      res.status(429).json({
+        error: 'Too many failed attempts',
+        nextValidRequestDate
+      });
+    }
+  });
+}
 
 // API Key Authentication
 const apiKeyAuth = async (req, res, next) => {

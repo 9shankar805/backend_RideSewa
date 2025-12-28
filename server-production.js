@@ -135,7 +135,7 @@ app.get('/admin', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 server.listen(PORT, () => {
   logger.info(`InDrive Backend started on port ${PORT}`);
   console.log(`🚀 InDrive Backend running on port ${PORT}`);
