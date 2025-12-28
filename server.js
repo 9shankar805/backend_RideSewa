@@ -1078,6 +1078,81 @@ app.get('/api/passengers/trips', authenticateToken, asyncHandler(async (req, res
   }
 }));
 
+// Get ride bids endpoint
+app.get('/api/rides/:rideId/bids', asyncHandler(async (req, res) => {
+  try {
+    const { rideId } = req.params;
+    // Mock bids for now
+    const mockBids = [
+      {
+        id: 'bid_1',
+        driver_id: 'driver_1',
+        proposed_fare: 120,
+        eta: 5,
+        driver_name: 'John Driver',
+        driver_rating: 4.8,
+        vehicle_type: 'Car'
+      }
+    ];
+    res.json(mockBids);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// Get ride details endpoint
+app.get('/api/rides/:rideId', asyncHandler(async (req, res) => {
+  try {
+    const { rideId } = req.params;
+    // Mock ride details
+    const mockRide = {
+      id: rideId,
+      status: 'searching',
+      pickup_address: 'Kathmandu, Nepal',
+      destination_address: 'Thamel, Kathmandu',
+      proposed_fare: 150,
+      created_at: new Date().toISOString()
+    };
+    res.json(mockRide);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// Wallet endpoint
+app.get('/api/wallet', asyncHandler(async (req, res) => {
+  try {
+    res.json({ balance: 500, transactions: [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// Notifications endpoint
+app.get('/api/users/notifications', asyncHandler(async (req, res) => {
+  try {
+    res.json([]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}));
+
+// Driver registration endpoint
+app.post('/api/drivers/register', asyncHandler(async (req, res) => {
+  try {
+    const mockDriver = {
+      id: 'driver_' + Date.now(),
+      user_id: 'user_' + Date.now(),
+      vehicle_type: 'car',
+      is_online: false,
+      is_available: false
+    };
+    res.json({ success: true, driver: mockDriver });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}));
+
 // Ride estimate endpoint
 app.post('/api/rides/estimate', asyncHandler(async (req, res) => {
   try {
@@ -1107,9 +1182,9 @@ app.post('/api/migrate', asyncHandler(async (req, res) => {
   try {
     console.log('🔧 Running database migrations...');
     
-    // Add phone_number column to users table
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);`);
-    console.log('✅ Added phone_number column to users');
+    // Add full_name column to users table
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255);`);
+    console.log('✅ Added full_name column to users');
     
     // Create driver_profiles table
     await query(`
