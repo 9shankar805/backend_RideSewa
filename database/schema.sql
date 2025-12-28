@@ -6,6 +6,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     phone_number VARCHAR(20) UNIQUE,
     email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255),
     full_name VARCHAR(255) NOT NULL,
     profile_image_url TEXT,
     user_type VARCHAR(20) NOT NULL CHECK (user_type IN ('passenger', 'driver', 'both')),
@@ -402,8 +403,17 @@ CREATE TABLE wallet_transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- OTP verifications for phone authentication
+CREATE TABLE otp_verifications (
+    phone_number VARCHAR(20) PRIMARY KEY,
+    otp VARCHAR(6) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX idx_users_phone ON users(phone_number);
+CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_type ON users(user_type);
 CREATE INDEX idx_driver_profiles_user_id ON driver_profiles(user_id);
 CREATE INDEX idx_driver_profiles_online ON driver_profiles(is_online, is_available);

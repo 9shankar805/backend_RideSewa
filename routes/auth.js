@@ -6,6 +6,95 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Email/Password Registration
+router.post('/register', async (req, res) => {
+  try {
+    const { email, password, full_name, phone_number, user_type = 'passenger' } = req.body;
+    
+    // Validate required fields
+    if (!email || !password || !full_name) {
+      return res.status(400).json({ error: 'Email, password, and full name are required' });
+    }
+    
+    // Check if user already exists
+    const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'User already exists with this email' });
+    }
+    
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Create user
+    const result = await query(`
+      INSERT INTO users (email, password_hash, full_name, phone_number, user_type, is_verified)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, email, full_name, phone_number, user_type, created_at
+    `, [email, hashedPassword, full_name, phone_number, user_type, true]);
+    
+    const user = result.rows[0];
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      success: true,
+      user,
+      token
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Email/Password Login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    
+    // Find user by email
+    const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    const user = result.rows[0];
+    
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    // Remove password from response
+    delete user.password_hash;
+    
+    res.json({
+      success: true,
+      user,
+      token
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Phone verification - Send OTP
 router.post('/send-otp', async (req, res) => {
   try {
@@ -84,6 +173,38 @@ router.post('/refresh-token', async (req, res) => {
     res.json({ token: newToken });
   } catch (error) {
     res.status(401).json({ error: 'Invalid refresh token' });
+  }
+});
+
+// Update user role
+router.put('/update-role', authenticateToken, async (req, res) => {
+  try {
+    const { user_type } = req.body;
+    const userId = req.user.id;
+    
+    // Validate user_type
+    if (!['passenger', 'driver', 'both'].includes(user_type)) {
+      return res.status(400).json({ error: 'Invalid user type' });
+    }
+    
+    // Update user role
+    const result = await query(`
+      UPDATE users 
+      SET user_type = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, email, full_name, phone_number, user_type, updated_at
+    `, [user_type, userId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({
+      success: true,
+      user: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
