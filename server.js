@@ -957,6 +957,16 @@ app.get('/api/admin/financial-reports', authenticateToken, cacheAnalytics, async
   }
 }));
 
+// WebSocket test endpoint
+app.get('/api/websocket/test', (req, res) => {
+  res.json({
+    websocket: 'enabled',
+    connectedUsers: realTimeService.getConnectedUsersCount(),
+    transports: ['websocket', 'polling'],
+    cors: 'enabled'
+  });
+});
+
 // Enhanced health check with detailed metrics
 app.get('/health', asyncHandler(async (req, res) => {
   try {
