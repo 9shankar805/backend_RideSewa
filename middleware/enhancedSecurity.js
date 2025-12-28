@@ -39,33 +39,49 @@ const createAdvancedRateLimit = (windowMs, max, message, skipSuccessfulRequests 
 
 // Brute Force Protection - make Redis optional
 let bruteForce;
-try {
-  const bruteForceStore = new RedisStore({
-    host: process.env.REDIS_HOST || 'localhost',
-    port: process.env.REDIS_PORT || 6379,
-    password: process.env.REDIS_PASSWORD
-  });
-  
-  bruteForce = new ExpressBrute(bruteForceStore, {
-    freeRetries: 5,
-    minWait: 5 * 60 * 1000, // 5 minutes
-    maxWait: 60 * 60 * 1000, // 1 hour
-    lifetime: 24 * 60 * 60, // 24 hours
-    failCallback: (req, res, next, nextValidRequestDate) => {
-      logger.warn('Brute force attack detected', {
-        ip: req.ip,
-        endpoint: req.originalUrl,
-        nextValidRequest: nextValidRequestDate
-      });
-      
-      res.status(429).json({
-        error: 'Too many failed attempts',
-        nextValidRequestDate
-      });
-    }
-  });
-} catch (error) {
-  console.log('⚠️  Redis not available - using memory store for brute force protection');
+if (process.env.REDIS_ENABLED === 'true' && process.env.REDIS_HOST) {
+  try {
+    const bruteForceStore = new RedisStore({
+      host: process.env.REDIS_HOST || 'localhost',
+      port: process.env.REDIS_PORT || 6379,
+      password: process.env.REDIS_PASSWORD
+    });
+    
+    bruteForce = new ExpressBrute(bruteForceStore, {
+      freeRetries: 5,
+      minWait: 5 * 60 * 1000, // 5 minutes
+      maxWait: 60 * 60 * 1000, // 1 hour
+      lifetime: 24 * 60 * 60, // 24 hours
+      failCallback: (req, res, next, nextValidRequestDate) => {
+        logger.warn('Brute force attack detected', {
+          ip: req.ip,
+          endpoint: req.originalUrl,
+          nextValidRequest: nextValidRequestDate
+        });
+        
+        res.status(429).json({
+          error: 'Too many failed attempts',
+          nextValidRequestDate
+        });
+      }
+    });
+  } catch (error) {
+    console.log('⚠️  Redis connection failed - using memory store for brute force protection');
+    bruteForce = new ExpressBrute(new ExpressBrute.MemoryStore(), {
+      freeRetries: 5,
+      minWait: 5 * 60 * 1000,
+      maxWait: 60 * 60 * 1000,
+      lifetime: 24 * 60 * 60,
+      failCallback: (req, res, next, nextValidRequestDate) => {
+        res.status(429).json({
+          error: 'Too many failed attempts',
+          nextValidRequestDate
+        });
+      }
+    });
+  }
+} else {
+  console.log('⚠️  Redis not enabled - using memory store for brute force protection');
   bruteForce = new ExpressBrute(new ExpressBrute.MemoryStore(), {
     freeRetries: 5,
     minWait: 5 * 60 * 1000,

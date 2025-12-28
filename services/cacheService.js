@@ -3,30 +3,36 @@ const logger = require('./loggerService');
 
 class CacheService {
   constructor() {
-    try {
-      this.redis = new Redis({
-        host: process.env.REDIS_HOST || 'localhost',
-        port: process.env.REDIS_PORT || 6379,
-        password: process.env.REDIS_PASSWORD,
-        retryDelayOnFailover: 100,
-        maxRetriesPerRequest: 3,
-        lazyConnect: true,
-        connectTimeout: 5000
-      });
+    // Only initialize Redis if explicitly enabled
+    if (process.env.REDIS_ENABLED === 'true' && process.env.REDIS_HOST) {
+      try {
+        this.redis = new Redis({
+          host: process.env.REDIS_HOST || 'localhost',
+          port: process.env.REDIS_PORT || 6379,
+          password: process.env.REDIS_PASSWORD,
+          retryDelayOnFailover: 100,
+          maxRetriesPerRequest: 3,
+          lazyConnect: true,
+          connectTimeout: 5000
+        });
 
-      this.redis.on('connect', () => {
-        logger.info('Redis connected successfully');
-        this.isConnected = true;
-      });
+        this.redis.on('connect', () => {
+          logger.info('Redis connected successfully');
+          this.isConnected = true;
+        });
 
-      this.redis.on('error', (err) => {
-        logger.error('Redis connection error', err);
+        this.redis.on('error', (err) => {
+          logger.error('Redis connection error', err);
+          this.isConnected = false;
+        });
+        
         this.isConnected = false;
-      });
-      
-      this.isConnected = false;
-    } catch (error) {
-      console.log('⚠️  Redis not available - caching disabled');
+      } catch (error) {
+        console.log('⚠️  Redis connection failed - caching disabled');
+        this.isConnected = false;
+      }
+    } else {
+      console.log('⚠️  Redis not enabled - caching disabled (set REDIS_ENABLED=true to enable)');
       this.isConnected = false;
     }
   }

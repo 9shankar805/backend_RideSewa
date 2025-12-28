@@ -39,7 +39,7 @@ const RideMatchingService = require('./services/rideMatchingService');
 const app = express();
 const server = http.createServer(app);
 
-// Initialize services
+// Initialize services (single initialization)
 const realTimeService = new RealTimeService(server);
 const rideMatchingService = new RideMatchingService(realTimeService);
 const mapsService = new MapsService();
