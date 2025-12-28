@@ -4,8 +4,8 @@
   "description": "Professional InDrive Clone Backend API with Real-time Features",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node server-production.js",
+    "dev": "node server.js",
     "migrate": "node migrate.js",
     "build": "npm install && npm run migrate",
     "test": "jest",

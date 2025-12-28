@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InDrive Admin Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .header { background: #2c3e50; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.5rem; }
+        .header .status { background: #27ae60; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .stat-card h3 { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .stat-card .value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
+        .stat-card.rides .value { color: #3498db; }
+        .stat-card.drivers .value { color: #27ae60; }
+        .stat-card.revenue .value { color: #e74c3c; }
+        .stat-card.users .value { color: #9b59b6; }
+        .tabs { display: flex; background: white; border-radius: 10px; margin-bottom: 2rem; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .tab { padding: 1rem 2rem; cursor: pointer; border: none; background: none; font-size: 1rem; transition: all 0.3s; }
+        .tab.active { background: #3498db; color: white; }
+        .tab:hover { background: #ecf0f1; }
+        .tab.active:hover { background: #2980b9; }
+        .content { background: white; border-radius: 10px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 1rem; text-align: left; border-bottom: 1px solid #ecf0f1; }
+        .table th { background: #f8f9fa; font-weight: 600; color: #2c3e50; }
+        .table tr:hover { background: #f8f9fa; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn:hover { opacity: 0.8; transform: translateY(-1px); }
+        .status-badge { padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500; }
+        .status-online { background: #d5f4e6; color: #27ae60; }
+        .status-offline { background: #fadbd8; color: #e74c3c; }
+        .status-pending { background: #fef9e7; color: #f39c12; }
+        .status-completed { background: #d5f4e6; color: #27ae60; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #2c3e50; }
+        .form-control { width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
+        .form-control:focus { outline: none; border-color: #3498db; box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2); }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-content { background: white; margin: 5% auto; padding: 2rem; border-radius: 10px; max-width: 500px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .close { font-size: 1.5rem; cursor: pointer; }
+        .loading { text-align: center; padding: 2rem; color: #7f8c8d; }
+        .error { background: #fadbd8; color: #e74c3c; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
+        .success { background: #d5f4e6; color: #27ae60; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
+        .chart-container { height: 300px; margin: 1rem 0; }
+        .hidden { display: none; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+        .card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .actions { display: flex; gap: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚗 InDrive Admin Dashboard</h1>
+        <div class="status" id="serverStatus">🟢 Online</div>
+    </div>
+
+    <div class="container">
+        <!-- Stats Overview -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card rides">
+                <h3>Total Rides</h3>
+                <div class="value" id="totalRides">-</div>
+            </div>
+            <div class="stat-card drivers">
+                <h3>Active Drivers</h3>
+                <div class="value" id="activeDrivers">-</div>
+            </div>
+            <div class="stat-card users">
+                <h3>Total Users</h3>
+                <div class="value" id="totalUsers">-</div>
+            </div>
+            <div class="stat-card revenue">
+                <h3>Today's Revenue</h3>
+                <div class="value" id="todayRevenue">$-</div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="tab" onclick="showTab('rides')">🚗 Rides</button>
+            <button class="tab" onclick="showTab('drivers')">👨‍💼 Drivers</button>
+            <button class="tab" onclick="showTab('users')">👥 Users</button>
+            <button class="tab" onclick="showTab('analytics')">📈 Analytics</button>
+            <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
+        </div>
+
+        <!-- Content Areas -->
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard-content" class="tab-content">
+                <h2>System Overview</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>🚗 Recent Rides</h3>
+                        <div id="recentRides">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>👨‍💼 Driver Applications</h3>
+                        <div id="driverApplications">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>🎫 Support Tickets</h3>
+                        <div id="supportTickets">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>📊 System Health</h3>
+                        <div id="systemHealth">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rides Tab -->
+            <div id="rides-content" class="tab-content hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>Ride Management</h2>
+                    <button class="btn btn-primary" onclick="refreshRides()">🔄 Refresh</button>
+                </div>
+                <table class="table" id="ridesTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Passenger</th>
+                            <th>Driver</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Fare</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ridesTableBody">
+                        <tr><td colspan="8" class="loading">Loading rides...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Drivers Tab -->
+            <div id="drivers-content" class="tab-content hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>Driver Management</h2>
+                    <div>
+                        <button class="btn btn-success" onclick="showDriverApplications()">📋 Applications</button>
+                        <button class="btn btn-primary" onclick="refreshDrivers()">🔄 Refresh</button>
+                    </div>
+                </div>
+                <table class="table" id="driversTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Vehicle</th>
+                            <th>Status</th>
+                            <th>Rating</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="driversTableBody">
+                        <tr><td colspan="7" class="loading">Loading drivers...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="users-content" class="tab-content hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>User Management</h2>
+                    <button class="btn btn-primary" onclick="refreshUsers()">🔄 Refresh</button>
+                </div>
+                <table class="table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Type</th>
+                            <th>Joined</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr><td colspan="6" class="loading">Loading users...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analytics-content" class="tab-content hidden">
+                <h2>Analytics & Reports</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>📊 Revenue Analytics</h3>
+                        <div class="chart-container" id="revenueChart">Loading chart...</div>
+                    </div>
+                    <div class="card">
+                        <h3>🚗 Ride Statistics</h3>
+                        <div class="chart-container" id="rideChart">Loading chart...</div>
+                    </div>
+                    <div class="card">
+                        <h3>👨‍💼 Driver Performance</h3>
+                        <div id="driverPerformance">Loading...</div>
+                    </div>
+                    <div class="card">
+                        <h3>📈 Growth Metrics</h3>
+                        <div id="growthMetrics">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-content" class="tab-content hidden">
+                <h2>System Settings</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>⚙️ App Configuration</h3>
+                        <div class="form-group">
+                            <label>Commission Rate (%)</label>
+                            <input type="number" class="form-control" id="commissionRate" value="15">
+                        </div>
+                        <div class="form-group">
+                            <label>Base Fare ($)</label>
+                            <input type="number" class="form-control" id="baseFare" value="2.50">
+                        </div>
+                        <div class="form-group">
+                            <label>Per KM Rate ($)</label>
+                            <input type="number" class="form-control" id="perKmRate" value="1.20">
+                        </div>
+                        <button class="btn btn-success" onclick="saveSettings()">💾 Save Settings</button>
+                    </div>
+                    <div class="card">
+                        <h3>🔧 System Controls</h3>
+                        <div class="form-group">
+                            <button class="btn btn-warning" onclick="runMaintenance()">🔧 Run Maintenance</button>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="clearCache()">🗑️ Clear Cache</button>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-danger" onclick="exportData()">📤 Export Data</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>📊 System Status</h3>
+                        <div id="systemStatus">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Driver Applications -->
+    <div id="applicationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Driver Application</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="applicationDetails">Loading...</div>
+            <div style="margin-top: 1rem;">
+                <button class="btn btn-success" onclick="approveApplication()">✅ Approve</button>
+                <button class="btn btn-danger" onclick="rejectApplication()">❌ Reject</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentApplicationId = null;
+        const API_BASE = window.location.origin;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+            setInterval(loadDashboardData, 30000); // Refresh every 30 seconds
+        });
+
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-content').classList.remove('hidden');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Load tab-specific data
+            switch(tabName) {
+                case 'rides':
+                    loadRides();
+                    break;
+                case 'drivers':
+                    loadDrivers();
+                    break;
+                case 'users':
+                    loadUsers();
+                    break;
+                case 'analytics':
+                    loadAnalytics();
+                    break;
+                case 'settings':
+                    loadSettings();
+                    break;
+            }
+        }
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'healthy') {
+                    document.getElementById('serverStatus').innerHTML = '🟢 Online';
+                    document.getElementById('serverStatus').style.background = '#27ae60';
+                } else {
+                    document.getElementById('serverStatus').innerHTML = '🔴 Issues';
+                    document.getElementById('serverStatus').style.background = '#e74c3c';
+                }
+                
+                // Load stats
+                loadStats();
+                loadRecentActivity();
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('serverStatus').innerHTML = '🔴 Offline';
+                document.getElementById('serverStatus').style.background = '#e74c3c';
+            }
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                // Mock data for demonstration
+                document.getElementById('totalRides').textContent = '1,234';
+                document.getElementById('activeDrivers').textContent = '89';
+                document.getElementById('totalUsers').textContent = '2,567';
+                document.getElementById('todayRevenue').textContent = '$3,456';
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load recent activity
+        async function loadRecentActivity() {
+            try {
+                document.getElementById('recentRides').innerHTML = `
+                    <div style="font-size: 0.9rem; color: #7f8c8d;">Last 5 rides:</div>
+                    <div style="margin-top: 0.5rem;">
+                        <div>🚗 John → Airport ($25.50)</div>
+                        <div>🚗 Sarah → Mall ($18.20)</div>
+                        <div>🚗 Mike → Station ($12.80)</div>
+                    </div>
+                `;
+                
+                document.getElementById('driverApplications').innerHTML = `
+                    <div style="font-size: 0.9rem; color: #7f8c8d;">Pending: 3 applications</div>
+                    <button class="btn btn-primary" style="margin-top: 0.5rem; font-size: 0.8rem;" onclick="showDriverApplications()">Review</button>
+                `;
+                
+                document.getElementById('supportTickets').innerHTML = `
+                    <div style="font-size: 0.9rem; color: #7f8c8d;">Open tickets: 2</div>
+                    <div style="margin-top: 0.5rem; font-size: 0.8rem;">🎫 Payment issue<br>🎫 App crash report</div>
+                `;
+                
+                document.getElementById('systemHealth').innerHTML = `
+                    <div style="font-size: 0.9rem;">
+                        <div>🟢 Database: Healthy</div>
+                        <div>🟢 Cache: Active</div>
+                        <div>🟢 Maps API: Working</div>
+                        <div>🟡 Email: Limited</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading recent activity:', error);
+            }
+        }
+
+        // Load rides
+        async function loadRides() {
+            try {
+                const tbody = document.getElementById('ridesTableBody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td>#R001</td>
+                        <td>John Doe</td>
+                        <td>Mike Driver</td>
+                        <td>Downtown</td>
+                        <td>Airport</td>
+                        <td>$25.50</td>
+                        <td><span class="status-badge status-completed">Completed</span></td>
+                        <td><button class="btn btn-primary">View</button></td>
+                    </tr>
+                    <tr>
+                        <td>#R002</td>
+                        <td>Sarah Smith</td>
+                        <td>Tom Driver</td>
+                        <td>Mall</td>
+                        <td>Home</td>
+                        <td>$18.20</td>
+                        <td><span class="status-badge status-pending">In Progress</span></td>
+                        <td><button class="btn btn-primary">View</button></td>
+                    </tr>
+                `;
+            } catch (error) {
+                console.error('Error loading rides:', error);
+            }
+        }
+
+        // Load drivers
+        async function loadDrivers() {
+            try {
+                const tbody = document.getElementById('driversTableBody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td>Mike Johnson</td>
+                        <td>mike@example.com</td>
+                        <td>+1234567890</td>
+                        <td>Toyota Camry</td>
+                        <td><span class="status-badge status-online">Online</span></td>
+                        <td>4.8 ⭐</td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-primary">View</button>
+                                <button class="btn btn-warning">Suspend</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Tom Wilson</td>
+                        <td>tom@example.com</td>
+                        <td>+1234567891</td>
+                        <td>Honda Civic</td>
+                        <td><span class="status-badge status-offline">Offline</span></td>
+                        <td>4.6 ⭐</td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-primary">View</button>
+                                <button class="btn btn-success">Activate</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            } catch (error) {
+                console.error('Error loading drivers:', error);
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const tbody = document.getElementById('usersTableBody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td>John Doe</td>
+                        <td>john@example.com</td>
+                        <td>Passenger</td>
+                        <td>2024-01-15</td>
+                        <td><span class="status-badge status-online">Active</span></td>
+                        <td><button class="btn btn-primary">View</button></td>
+                    </tr>
+                    <tr>
+                        <td>Sarah Smith</td>
+                        <td>sarah@example.com</td>
+                        <td>Passenger</td>
+                        <td>2024-01-10</td>
+                        <td><span class="status-badge status-online">Active</span></td>
+                        <td><button class="btn btn-primary">View</button></td>
+                    </tr>
+                `;
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Load analytics
+        async function loadAnalytics() {
+            try {
+                document.getElementById('revenueChart').innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #7f8c8d;">
+                        📊 Revenue Chart<br>
+                        <div style="margin-top: 1rem; font-size: 1.2rem;">$12,345 this month</div>
+                        <div style="font-size: 0.9rem; color: #27ae60;">↗️ +15% from last month</div>
+                    </div>
+                `;
+                
+                document.getElementById('rideChart').innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #7f8c8d;">
+                        🚗 Ride Statistics<br>
+                        <div style="margin-top: 1rem; font-size: 1.2rem;">1,234 rides this month</div>
+                        <div style="font-size: 0.9rem; color: #27ae60;">↗️ +8% from last month</div>
+                    </div>
+                `;
+                
+                document.getElementById('driverPerformance').innerHTML = `
+                    <div style="font-size: 0.9rem;">
+                        <div>🏆 Top Driver: Mike Johnson (4.9⭐)</div>
+                        <div>📈 Average Rating: 4.7⭐</div>
+                        <div>🚗 Active Drivers: 89</div>
+                        <div>📊 Completion Rate: 96%</div>
+                    </div>
+                `;
+                
+                document.getElementById('growthMetrics').innerHTML = `
+                    <div style="font-size: 0.9rem;">
+                        <div>👥 New Users: +45 this week</div>
+                        <div>👨‍💼 New Drivers: +12 this week</div>
+                        <div>📱 App Downloads: +234</div>
+                        <div>💰 Revenue Growth: +15%</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+            }
+        }
+
+        // Load settings
+        async function loadSettings() {
+            try {
+                document.getElementById('systemStatus').innerHTML = `
+                    <div style="font-size: 0.9rem;">
+                        <div>🖥️ Server: Running</div>
+                        <div>💾 Database: Connected</div>
+                        <div>🗄️ Cache: Active</div>
+                        <div>🌐 APIs: Operational</div>
+                        <div>📧 Email: Limited</div>
+                        <div>📱 SMS: Disabled</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        // Utility functions
+        function refreshRides() {
+            loadRides();
+            showNotification('Rides refreshed', 'success');
+        }
+
+        function refreshDrivers() {
+            loadDrivers();
+            showNotification('Drivers refreshed', 'success');
+        }
+
+        function refreshUsers() {
+            loadUsers();
+            showNotification('Users refreshed', 'success');
+        }
+
+        function showDriverApplications() {
+            document.getElementById('applicationModal').style.display = 'block';
+            document.getElementById('applicationDetails').innerHTML = `
+                <div>
+                    <h4>Driver Application #DA001</h4>
+                    <p><strong>Name:</strong> Alex Rodriguez</p>
+                    <p><strong>Email:</strong> alex@example.com</p>
+                    <p><strong>Phone:</strong> +1234567892</p>
+                    <p><strong>Vehicle:</strong> 2020 Honda Accord</p>
+                    <p><strong>License:</strong> Valid until 2026</p>
+                    <p><strong>Insurance:</strong> Valid until 2025</p>
+                </div>
+            `;
+            currentApplicationId = 'DA001';
+        }
+
+        function closeModal() {
+            document.getElementById('applicationModal').style.display = 'none';
+        }
+
+        function approveApplication() {
+            showNotification('Application approved successfully', 'success');
+            closeModal();
+        }
+
+        function rejectApplication() {
+            showNotification('Application rejected', 'error');
+            closeModal();
+        }
+
+        function saveSettings() {
+            showNotification('Settings saved successfully', 'success');
+        }
+
+        function runMaintenance() {
+            showNotification('Maintenance completed', 'success');
+        }
+
+        function clearCache() {
+            showNotification('Cache cleared successfully', 'success');
+        }
+
+        function exportData() {
+            showNotification('Data export started', 'success');
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = type === 'success' ? 'success' : 'error';
+            notification.textContent = message;
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.right = '20px';
+            notification.style.zIndex = '9999';
+            notification.style.padding = '1rem';
+            notification.style.borderRadius = '5px';
+            notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 3000);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('applicationModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

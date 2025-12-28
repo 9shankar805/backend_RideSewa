@@ -4,24 +4,41 @@ const { query } = require('../database/connection');
 
 class CommunicationService {
   constructor() {
-    // Email transporter
-    this.emailTransporter = nodemailer.createTransporter({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+    // Email transporter - only initialize if credentials are provided
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+      this.emailTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD
+        }
+      });
+      this.emailEnabled = true;
+    } else {
+      console.log('⚠️  Email not configured - email notifications disabled');
+      this.emailEnabled = false;
+    }
 
-    // Twilio client
-    this.twilioClient = twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
+    // Twilio client - only initialize if credentials are provided
+    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+      this.twilioClient = twilio(
+        process.env.TWILIO_ACCOUNT_SID,
+        process.env.TWILIO_AUTH_TOKEN
+      );
+      this.smsEnabled = true;
+    } else {
+      console.log('⚠️  Twilio not configured - SMS notifications disabled');
+      this.smsEnabled = false;
+    }
   }
 
   async sendSMS(phoneNumber, message) {
     try {
+      if (!this.smsEnabled) {
+        console.log('SMS disabled - message stored only:', message);
+        return { success: true, method: 'disabled' };
+      }
+
       const result = await this.twilioClient.messages.create({
         body: message,
         from: process.env.TWILIO_PHONE_NUMBER,
@@ -36,6 +53,11 @@ class CommunicationService {
 
   async sendEmail(to, subject, html, text = null) {
     try {
+      if (!this.emailEnabled) {
+        console.log('Email disabled - message stored only:', subject);
+        return { success: true, method: 'disabled' };
+      }
+
       const mailOptions = {
         from: process.env.EMAIL_USER,
         to,
