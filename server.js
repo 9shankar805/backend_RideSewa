@@ -942,12 +942,14 @@ app.get('/api/admin/financial-reports', authenticateToken, cacheAnalytics, async
 // Enhanced health check with detailed metrics
 app.get('/health', asyncHandler(async (req, res) => {
   try {
-    const metrics = await analyticsService.getPerformanceMetrics();
+    // Simple health check without analytics
+    const dbTest = await query('SELECT 1 as test');
+    
     res.json({ 
       status: 'healthy', 
       timestamp: new Date().toISOString(),
       connections: realTimeService.getConnectedUsersCount(),
-      metrics
+      database: dbTest.rows.length > 0 ? 'connected' : 'disconnected'
     });
   } catch (error) {
     res.status(500).json({ 
