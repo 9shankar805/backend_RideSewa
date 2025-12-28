@@ -1158,6 +1158,28 @@ app.get('/api/users/notifications', asyncHandler(async (req, res) => {
   }
 }));
 
+// Driver status endpoint (no auth for testing)
+app.post('/api/drivers/status', asyncHandler(async (req, res) => {
+  try {
+    const { isOnline, isAvailable } = req.body;
+    console.log('🚗 Driver status update:', { isOnline, isAvailable });
+    res.json({ success: true, isOnline, isAvailable });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}));
+
+// Driver location endpoint (no auth for testing)
+app.post('/api/drivers/location', asyncHandler(async (req, res) => {
+  try {
+    const { latitude, longitude, heading } = req.body;
+    console.log('🚗 Driver location update:', { latitude, longitude });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}));
+
 // Driver registration endpoint
 app.post('/api/drivers/register', asyncHandler(async (req, res) => {
   try {
@@ -1276,7 +1298,8 @@ app.get('/api/websocket/test', (req, res) => {
     websocket: 'enabled',
     connectedUsers: realTimeService.getConnectedUsersCount(),
     transports: ['websocket', 'polling'],
-    cors: 'enabled'
+    cors: 'enabled',
+    url: 'wss://backend-ridesewa.onrender.com'
   });
 });
 
