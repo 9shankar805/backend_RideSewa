@@ -40,6 +40,8 @@
         .status-offline { background: #fadbd8; color: #e74c3c; }
         .status-pending { background: #fef9e7; color: #f39c12; }
         .status-completed { background: #d5f4e6; color: #27ae60; }
+        .status-in_progress { background: #e3f2fd; color: #2196f3; }
+        .status-busy { background: #fff3e0; color: #ff9800; }
         .form-group { margin-bottom: 1rem; }
         .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #2c3e50; }
         .form-control { width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
@@ -69,19 +71,19 @@
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card rides">
                 <h3>Total Rides</h3>
-                <div class="value" id="totalRides">-</div>
+                <div class="value" id="totalRides">Loading...</div>
             </div>
             <div class="stat-card drivers">
                 <h3>Active Drivers</h3>
-                <div class="value" id="activeDrivers">-</div>
+                <div class="value" id="activeDrivers">Loading...</div>
             </div>
             <div class="stat-card users">
                 <h3>Total Users</h3>
-                <div class="value" id="totalUsers">-</div>
+                <div class="value" id="totalUsers">Loading...</div>
             </div>
             <div class="stat-card revenue">
                 <h3>Today's Revenue</h3>
-                <div class="value" id="todayRevenue">$-</div>
+                <div class="value" id="todayRevenue">Loading...</div>
             </div>
         </div>
 
@@ -89,7 +91,7 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
             <button class="tab" onclick="showTab('rides')">🚗 Rides</button>
-            <button class="tab" onclick="showTab('drivers')">👨‍💼 Drivers</button>
+            <button class="tab" onclick="showTab('drivers')">👨💼 Drivers</button>
             <button class="tab" onclick="showTab('users')">👥 Users</button>
             <button class="tab" onclick="showTab('analytics')">📈 Analytics</button>
             <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
@@ -106,7 +108,7 @@
                         <div id="recentRides">Loading...</div>
                     </div>
                     <div class="card">
-                        <h3>👨‍💼 Driver Applications</h3>
+                        <h3>👨💼 Driver Applications</h3>
                         <div id="driverApplications">Loading...</div>
                     </div>
                     <div class="card">
@@ -208,7 +210,7 @@
                         <div class="chart-container" id="rideChart">Loading chart...</div>
                     </div>
                     <div class="card">
-                        <h3>👨‍💼 Driver Performance</h3>
+                        <h3>👨💼 Driver Performance</h3>
                         <div id="driverPerformance">Loading...</div>
                     </div>
                     <div class="card">
@@ -351,192 +353,235 @@
         // Load statistics
         async function loadStats() {
             try {
-                // Mock data for demonstration
-                document.getElementById('totalRides').textContent = '1,234';
-                document.getElementById('activeDrivers').textContent = '89';
-                document.getElementById('totalUsers').textContent = '2,567';
-                document.getElementById('todayRevenue').textContent = '$3,456';
+                const response = await fetch(`${API_BASE}/api/admin/dashboard`);
+                const data = await response.json();
+                
+                document.getElementById('totalRides').textContent = data.totalRides.toLocaleString();
+                document.getElementById('activeDrivers').textContent = data.activeDrivers;
+                document.getElementById('totalUsers').textContent = data.totalUsers.toLocaleString();
+                document.getElementById('todayRevenue').textContent = `$${data.todayRevenue.toLocaleString()}`;
             } catch (error) {
                 console.error('Error loading stats:', error);
+                document.getElementById('totalRides').textContent = 'Error';
+                document.getElementById('activeDrivers').textContent = 'Error';
+                document.getElementById('totalUsers').textContent = 'Error';
+                document.getElementById('todayRevenue').textContent = 'Error';
             }
         }
 
         // Load recent activity
         async function loadRecentActivity() {
             try {
-                document.getElementById('recentRides').innerHTML = `
-                    <div style="font-size: 0.9rem; color: #7f8c8d;">Last 5 rides:</div>
-                    <div style="margin-top: 0.5rem;">
-                        <div>🚗 John → Airport ($25.50)</div>
-                        <div>🚗 Sarah → Mall ($18.20)</div>
-                        <div>🚗 Mike → Station ($12.80)</div>
-                    </div>
-                `;
+                const response = await fetch(`${API_BASE}/api/admin/dashboard`);
+                const data = await response.json();
                 
+                // Recent Rides
+                let ridesHtml = '<div style="font-size: 0.9rem; color: #7f8c8d;">Recent rides:</div><div style="margin-top: 0.5rem;">';
+                data.recentRides.slice(0, 3).forEach(ride => {
+                    ridesHtml += `<div>🚗 ${ride.passenger} → $${ride.fare}</div>`;
+                });
+                ridesHtml += '</div>';
+                document.getElementById('recentRides').innerHTML = ridesHtml;
+                
+                // Driver Applications
+                const pendingApps = data.driverApplications.filter(app => app.status === 'pending').length;
                 document.getElementById('driverApplications').innerHTML = `
-                    <div style="font-size: 0.9rem; color: #7f8c8d;">Pending: 3 applications</div>
+                    <div style="font-size: 0.9rem; color: #7f8c8d;">Pending: ${pendingApps} applications</div>
                     <button class="btn btn-primary" style="margin-top: 0.5rem; font-size: 0.8rem;" onclick="showDriverApplications()">Review</button>
                 `;
                 
-                document.getElementById('supportTickets').innerHTML = `
-                    <div style="font-size: 0.9rem; color: #7f8c8d;">Open tickets: 2</div>
-                    <div style="margin-top: 0.5rem; font-size: 0.8rem;">🎫 Payment issue<br>🎫 App crash report</div>
-                `;
+                // Support Tickets
+                const openTickets = data.supportTickets.filter(ticket => ticket.status === 'open').length;
+                let ticketsHtml = `<div style="font-size: 0.9rem; color: #7f8c8d;">Open tickets: ${openTickets}</div><div style="margin-top: 0.5rem; font-size: 0.8rem;">`;
+                data.supportTickets.slice(0, 2).forEach(ticket => {
+                    ticketsHtml += `🎫 ${ticket.subject}<br>`;
+                });
+                ticketsHtml += '</div>';
+                document.getElementById('supportTickets').innerHTML = ticketsHtml;
                 
+                // System Health
+                const health = data.systemHealth;
                 document.getElementById('systemHealth').innerHTML = `
                     <div style="font-size: 0.9rem;">
-                        <div>🟢 Database: Healthy</div>
-                        <div>🟢 Cache: Active</div>
-                        <div>🟢 Maps API: Working</div>
-                        <div>🟡 Email: Limited</div>
+                        <div>🟢 Database: ${health.database}</div>
+                        <div>🟡 Redis: ${health.redis}</div>
+                        <div>🟢 API: ${health.api}</div>
+                        <div>📊 Uptime: ${health.uptime}</div>
                     </div>
                 `;
             } catch (error) {
                 console.error('Error loading recent activity:', error);
+                document.getElementById('recentRides').innerHTML = 'Error loading data';
+                document.getElementById('driverApplications').innerHTML = 'Error loading data';
+                document.getElementById('supportTickets').innerHTML = 'Error loading data';
+                document.getElementById('systemHealth').innerHTML = 'Error loading data';
             }
         }
 
         // Load rides
         async function loadRides() {
             try {
+                const response = await fetch(`${API_BASE}/api/rides`);
+                const rides = await response.json();
+                
                 const tbody = document.getElementById('ridesTableBody');
-                tbody.innerHTML = `
+                if (rides.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="loading">No rides found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = rides.map(ride => `
                     <tr>
-                        <td>#R001</td>
-                        <td>John Doe</td>
-                        <td>Mike Driver</td>
-                        <td>Downtown</td>
-                        <td>Airport</td>
-                        <td>$25.50</td>
-                        <td><span class="status-badge status-completed">Completed</span></td>
-                        <td><button class="btn btn-primary">View</button></td>
+                        <td>${ride.id}</td>
+                        <td>${ride.passenger}</td>
+                        <td>${ride.driver}</td>
+                        <td>${ride.from}</td>
+                        <td>${ride.to}</td>
+                        <td>$${ride.fare}</td>
+                        <td><span class="status-badge status-${ride.status}">${ride.status.replace('_', ' ')}</span></td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-primary" onclick="viewRide('${ride.id}')">View</button>
+                                ${ride.status === 'pending' ? `<button class="btn btn-danger" onclick="cancelRide('${ride.id}')">Cancel</button>` : ''}
+                            </div>
+                        </td>
                     </tr>
-                    <tr>
-                        <td>#R002</td>
-                        <td>Sarah Smith</td>
-                        <td>Tom Driver</td>
-                        <td>Mall</td>
-                        <td>Home</td>
-                        <td>$18.20</td>
-                        <td><span class="status-badge status-pending">In Progress</span></td>
-                        <td><button class="btn btn-primary">View</button></td>
-                    </tr>
-                `;
+                `).join('');
             } catch (error) {
                 console.error('Error loading rides:', error);
+                document.getElementById('ridesTableBody').innerHTML = '<tr><td colspan="8" class="error">Error loading rides</td></tr>';
             }
         }
 
         // Load drivers
         async function loadDrivers() {
             try {
+                const response = await fetch(`${API_BASE}/api/drivers`);
+                const drivers = await response.json();
+                
                 const tbody = document.getElementById('driversTableBody');
-                tbody.innerHTML = `
+                if (drivers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="loading">No drivers found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = drivers.map(driver => `
                     <tr>
-                        <td>Mike Johnson</td>
-                        <td>mike@example.com</td>
-                        <td>+1234567890</td>
-                        <td>Toyota Camry</td>
-                        <td><span class="status-badge status-online">Online</span></td>
-                        <td>4.8 ⭐</td>
+                        <td>${driver.name}</td>
+                        <td>${driver.email}</td>
+                        <td>${driver.phone}</td>
+                        <td>${driver.vehicle}</td>
+                        <td><span class="status-badge status-${driver.status}">${driver.status}</span></td>
+                        <td>${driver.rating} ⭐</td>
                         <td>
                             <div class="actions">
-                                <button class="btn btn-primary">View</button>
-                                <button class="btn btn-warning">Suspend</button>
+                                <button class="btn btn-primary" onclick="viewDriver('${driver.id}')">View</button>
+                                ${driver.status === 'online' ? 
+                                    `<button class="btn btn-warning" onclick="suspendDriver('${driver.id}')">Suspend</button>` :
+                                    `<button class="btn btn-success" onclick="activateDriver('${driver.id}')">Activate</button>`
+                                }
                             </div>
                         </td>
                     </tr>
-                    <tr>
-                        <td>Tom Wilson</td>
-                        <td>tom@example.com</td>
-                        <td>+1234567891</td>
-                        <td>Honda Civic</td>
-                        <td><span class="status-badge status-offline">Offline</span></td>
-                        <td>4.6 ⭐</td>
-                        <td>
-                            <div class="actions">
-                                <button class="btn btn-primary">View</button>
-                                <button class="btn btn-success">Activate</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                `).join('');
             } catch (error) {
                 console.error('Error loading drivers:', error);
+                document.getElementById('driversTableBody').innerHTML = '<tr><td colspan="7" class="error">Error loading drivers</td></tr>';
             }
         }
 
         // Load users
         async function loadUsers() {
             try {
+                const response = await fetch(`${API_BASE}/api/users`);
+                const users = await response.json();
+                
                 const tbody = document.getElementById('usersTableBody');
-                tbody.innerHTML = `
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="loading">No users found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = users.map(user => `
                     <tr>
-                        <td>John Doe</td>
-                        <td>john@example.com</td>
+                        <td>${user.name}</td>
+                        <td>${user.email}</td>
                         <td>Passenger</td>
-                        <td>2024-01-15</td>
-                        <td><span class="status-badge status-online">Active</span></td>
-                        <td><button class="btn btn-primary">View</button></td>
+                        <td>${user.joined}</td>
+                        <td><span class="status-badge status-${user.status === 'active' ? 'online' : 'offline'}">${user.status}</span></td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn btn-primary" onclick="viewUser('${user.id}')">View</button>
+                                ${user.status === 'active' ? 
+                                    `<button class="btn btn-warning" onclick="suspendUser('${user.id}')">Suspend</button>` :
+                                    `<button class="btn btn-success" onclick="activateUser('${user.id}')">Activate</button>`
+                                }
+                            </div>
+                        </td>
                     </tr>
-                    <tr>
-                        <td>Sarah Smith</td>
-                        <td>sarah@example.com</td>
-                        <td>Passenger</td>
-                        <td>2024-01-10</td>
-                        <td><span class="status-badge status-online">Active</span></td>
-                        <td><button class="btn btn-primary">View</button></td>
-                    </tr>
-                `;
+                `).join('');
             } catch (error) {
                 console.error('Error loading users:', error);
+                document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="6" class="error">Error loading users</td></tr>';
             }
         }
 
         // Load analytics
         async function loadAnalytics() {
             try {
+                const response = await fetch(`${API_BASE}/api/analytics/overview`);
+                const data = await response.json();
+                
                 document.getElementById('revenueChart').innerHTML = `
                     <div style="text-align: center; padding: 2rem; color: #7f8c8d;">
                         📊 Revenue Chart<br>
-                        <div style="margin-top: 1rem; font-size: 1.2rem;">$12,345 this month</div>
-                        <div style="font-size: 0.9rem; color: #27ae60;">↗️ +15% from last month</div>
+                        <div style="margin-top: 1rem; font-size: 1.2rem;">$${data.weeklyRevenue.reduce((a,b) => a+b, 0).toLocaleString()} this week</div>
+                        <div style="font-size: 0.9rem; color: #27ae60;">↗️ Weekly average: $${Math.round(data.weeklyRevenue.reduce((a,b) => a+b, 0) / 7)}</div>
                     </div>
                 `;
                 
                 document.getElementById('rideChart').innerHTML = `
                     <div style="text-align: center; padding: 2rem; color: #7f8c8d;">
                         🚗 Ride Statistics<br>
-                        <div style="margin-top: 1rem; font-size: 1.2rem;">1,234 rides this month</div>
-                        <div style="font-size: 0.9rem; color: #27ae60;">↗️ +8% from last month</div>
+                        <div style="margin-top: 1rem; font-size: 1.2rem;">${data.dailyRides.reduce((a,b) => a+b, 0)} rides this week</div>
+                        <div style="font-size: 0.9rem; color: #27ae60;">↗️ Daily average: ${Math.round(data.dailyRides.reduce((a,b) => a+b, 0) / 7)}</div>
                     </div>
                 `;
                 
-                document.getElementById('driverPerformance').innerHTML = `
-                    <div style="font-size: 0.9rem;">
-                        <div>🏆 Top Driver: Mike Johnson (4.9⭐)</div>
-                        <div>📈 Average Rating: 4.7⭐</div>
-                        <div>🚗 Active Drivers: 89</div>
-                        <div>📊 Completion Rate: 96%</div>
-                    </div>
-                `;
+                let performanceHtml = '<div style="font-size: 0.9rem;">';
+                data.driverPerformance.forEach(driver => {
+                    performanceHtml += `<div>🏆 ${driver.name}: ${driver.rides} rides, $${driver.earnings}</div>`;
+                });
+                performanceHtml += '</div>';
+                document.getElementById('driverPerformance').innerHTML = performanceHtml;
                 
                 document.getElementById('growthMetrics').innerHTML = `
                     <div style="font-size: 0.9rem;">
-                        <div>👥 New Users: +45 this week</div>
-                        <div>👨‍💼 New Drivers: +12 this week</div>
-                        <div>📱 App Downloads: +234</div>
-                        <div>💰 Revenue Growth: +15%</div>
+                        <div>👥 Total Users: ${data.userGrowth[data.userGrowth.length - 1].toLocaleString()}</div>
+                        <div>📈 Growth: +${data.userGrowth[data.userGrowth.length - 1] - data.userGrowth[data.userGrowth.length - 2]} this period</div>
+                        <div>📱 User Retention: 85%</div>
+                        <div>💰 Revenue Growth: +12%</div>
                     </div>
                 `;
             } catch (error) {
                 console.error('Error loading analytics:', error);
+                document.getElementById('revenueChart').innerHTML = 'Error loading chart';
+                document.getElementById('rideChart').innerHTML = 'Error loading chart';
+                document.getElementById('driverPerformance').innerHTML = 'Error loading data';
+                document.getElementById('growthMetrics').innerHTML = 'Error loading data';
             }
         }
 
         // Load settings
         async function loadSettings() {
             try {
+                const response = await fetch(`${API_BASE}/api/settings`);
+                const settings = await response.json();
+                
+                document.getElementById('commissionRate').value = settings.commissionRate * 100;
+                document.getElementById('baseFare').value = settings.baseFare;
+                document.getElementById('perKmRate').value = settings.perKmRate;
+                
                 document.getElementById('systemStatus').innerHTML = `
                     <div style="font-size: 0.9rem;">
                         <div>🖥️ Server: Running</div>
@@ -549,7 +594,68 @@
                 `;
             } catch (error) {
                 console.error('Error loading settings:', error);
+                document.getElementById('systemStatus').innerHTML = 'Error loading system status';
             }
+        }
+
+        // Action functions
+        function viewRide(rideId) {
+            showNotification(`Viewing ride ${rideId}`, 'success');
+        }
+        
+        function cancelRide(rideId) {
+            if (confirm('Are you sure you want to cancel this ride?')) {
+                fetch(`${API_BASE}/api/rides/${rideId}/cancel`, { method: 'POST' })
+                .then(() => {
+                    showNotification('Ride cancelled successfully', 'success');
+                    loadRides();
+                })
+                .catch(error => showNotification('Error cancelling ride', 'error'));
+            }
+        }
+        
+        function viewDriver(driverId) {
+            showNotification(`Viewing driver ${driverId}`, 'success');
+        }
+        
+        function suspendDriver(driverId) {
+            if (confirm('Are you sure you want to suspend this driver?')) {
+                fetch(`${API_BASE}/api/drivers/${driverId}/suspend`, { method: 'POST' })
+                .then(() => {
+                    showNotification('Driver suspended successfully', 'success');
+                    loadDrivers();
+                })
+                .catch(error => showNotification('Error suspending driver', 'error'));
+            }
+        }
+        
+        function activateDriver(driverId) {
+            fetch(`${API_BASE}/api/drivers/${driverId}/approve`, { method: 'POST' })
+            .then(() => {
+                showNotification('Driver activated successfully', 'success');
+                loadDrivers();
+            })
+            .catch(error => showNotification('Error activating driver', 'error'));
+        }
+        
+        function viewUser(userId) {
+            showNotification(`Viewing user ${userId}`, 'success');
+        }
+        
+        function suspendUser(userId) {
+            if (confirm('Are you sure you want to suspend this user?')) {
+                fetch(`${API_BASE}/api/users/${userId}/suspend`, { method: 'POST' })
+                .then(() => {
+                    showNotification('User suspended successfully', 'success');
+                    loadUsers();
+                })
+                .catch(error => showNotification('Error suspending user', 'error'));
+            }
+        }
+        
+        function activateUser(userId) {
+            showNotification('User activated successfully', 'success');
+            loadUsers();
         }
 
         // Utility functions
@@ -599,7 +705,25 @@
         }
 
         function saveSettings() {
-            showNotification('Settings saved successfully', 'success');
+            const settings = {
+                commissionRate: parseFloat(document.getElementById('commissionRate').value) / 100,
+                baseFare: parseFloat(document.getElementById('baseFare').value),
+                perKmRate: parseFloat(document.getElementById('perKmRate').value)
+            };
+            
+            fetch(`${API_BASE}/api/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('Settings saved successfully', 'success');
+            })
+            .catch(error => {
+                console.error('Error saving settings:', error);
+                showNotification('Error saving settings', 'error');
+            });
         }
 
         function runMaintenance() {

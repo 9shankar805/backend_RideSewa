@@ -1,8 +1,20 @@
+const { Pool } = require('pg');
+require('dotenv').config();
+
+// Database connection
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+});
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
 
 // Basic middleware only
 const app = express();
@@ -14,9 +26,24 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'admin-dashboard')));
 
-// Mock database connection
+// Test database connection
 const testConnection = async () => {
-  console.log('✅ Database connection test: OK (using Render PostgreSQL)');
+  try {
+    console.log('Attempting database connection...');
+    console.log('DB_HOST:', process.env.DB_HOST);
+    console.log('DB_PORT:', process.env.DB_PORT);
+    console.log('DB_NAME:', process.env.DB_NAME);
+    console.log('DB_USER:', process.env.DB_USER);
+    console.log('DB_SSL:', process.env.DB_SSL);
+    
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW()');
+    client.release();
+    console.log('✅ Database connection test: OK (PostgreSQL connected)');
+  } catch (error) {
+    console.log('⚠️  Database connection failed:', error.message);
+    console.log('Full error:', error);
+  }
 };
 
 // Initialize services with error handling
@@ -84,35 +111,163 @@ if (mapsService) {
 
 // Admin dashboard routes
 app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin-dashboard', 'index.html'));
+  res.sendFile(path.join(__dirname, 'admin-dashboard', 'admin.html'));
 });
 
 app.get('/admin-dashboard/admin.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-dashboard', 'admin.html'));
 });
 
-// Basic API endpoints for demo
-app.get('/api/dashboard/stats', (req, res) => {
-  res.json({
-    totalRides: 1234,
-    activeDrivers: 89,
-    totalUsers: 2567,
-    todayRevenue: 3456
-  });
+app.get('/admin-dashboard/simple.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-dashboard', 'simple.html'));
+});
+
+// Admin API endpoints
+app.get('/api/admin/dashboard', async (req, res) => {
+  try {
+    const client = await pool.connect();
+    
+    // Create tables if they don't exist
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255),
+        email VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS drivers (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255),
+        email VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'offline',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS rides (
+        id SERIAL PRIMARY KEY,
+        passenger_id INTEGER,
+        driver_id INTEGER,
+        fare DECIMAL(10,2),
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Get counts
+    const ridesResult = await client.query('SELECT COUNT(*) as count FROM rides');
+    const driversResult = await client.query('SELECT COUNT(*) as count FROM drivers WHERE status = $1', ['online']);
+    const usersResult = await client.query('SELECT COUNT(*) as count FROM users');
+    const revenueResult = await client.query('SELECT COALESCE(SUM(fare), 0) as total FROM rides WHERE DATE(created_at) = CURRENT_DATE AND status = $1', ['completed']);
+    
+    client.release();
+    
+    res.json({
+      totalRides: parseInt(ridesResult.rows[0].count),
+      activeDrivers: parseInt(driversResult.rows[0].count),
+      totalUsers: parseInt(usersResult.rows[0].count),
+      todayRevenue: parseFloat(revenueResult.rows[0].total),
+      recentRides: [],
+      driverApplications: [],
+      supportTickets: [],
+      systemHealth: {
+        database: 'healthy',
+        redis: 'degraded',
+        api: 'healthy',
+        uptime: '99.9%'
+      }
+    });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: 'Database connection failed' });
+  }
 });
 
 app.get('/api/rides', (req, res) => {
   res.json([
-    {
-      id: 'R001',
-      passenger: 'John Doe',
-      driver: 'Mike Johnson',
-      from: 'Downtown',
-      to: 'Airport',
-      fare: 25.50,
-      status: 'completed'
-    }
+    { id: 'R001', passenger: 'John Doe', driver: 'Mike Johnson', from: 'Downtown', to: 'Airport', fare: 25.50, status: 'completed' },
+    { id: 'R002', passenger: 'Jane Smith', driver: 'Sarah Wilson', from: 'Mall', to: 'Home', fare: 18.75, status: 'in_progress' },
+    { id: 'R003', passenger: 'Bob Brown', driver: 'Tom Davis', from: 'Office', to: 'Station', fare: 32.00, status: 'pending' },
+    { id: 'R004', passenger: 'Alice Johnson', driver: 'Lisa Chen', from: 'Hotel', to: 'Airport', fare: 45.25, status: 'completed' }
   ]);
+});
+
+app.get('/api/drivers', (req, res) => {
+  res.json([
+    { id: 'D001', name: 'Mike Johnson', email: 'mike@email.com', phone: '+1234567890', vehicle: 'Toyota Camry 2020', status: 'online', rating: 4.8 },
+    { id: 'D002', name: 'Sarah Wilson', email: 'sarah@email.com', phone: '+1234567891', vehicle: 'Honda Civic 2019', status: 'busy', rating: 4.9 },
+    { id: 'D003', name: 'Tom Davis', email: 'tom@email.com', phone: '+1234567892', vehicle: 'Ford Focus 2021', status: 'offline', rating: 4.7 },
+    { id: 'D004', name: 'Lisa Chen', email: 'lisa@email.com', phone: '+1234567893', vehicle: 'Nissan Altima 2020', status: 'online', rating: 4.6 }
+  ]);
+});
+
+app.get('/api/users', (req, res) => {
+  res.json([
+    { id: 'U001', name: 'John Doe', email: 'john@email.com', phone: '+1234567894', rides: 25, status: 'active', joined: '2023-01-15' },
+    { id: 'U002', name: 'Jane Smith', email: 'jane@email.com', phone: '+1234567895', rides: 18, status: 'active', joined: '2023-02-20' },
+    { id: 'U003', name: 'Bob Brown', email: 'bob@email.com', phone: '+1234567896', rides: 42, status: 'inactive', joined: '2022-11-10' },
+    { id: 'U004', name: 'Alice Johnson', email: 'alice@email.com', phone: '+1234567897', rides: 33, status: 'active', joined: '2023-03-05' }
+  ]);
+});
+
+app.get('/api/analytics/overview', (req, res) => {
+  res.json({
+    dailyRides: [45, 52, 38, 61, 49, 73, 68],
+    weeklyRevenue: [1250, 1380, 1150, 1420, 1290, 1650, 1580],
+    driverPerformance: [
+      { name: 'Mike Johnson', rides: 28, rating: 4.8, earnings: 850 },
+      { name: 'Sarah Wilson', rides: 32, rating: 4.9, earnings: 920 },
+      { name: 'Tom Davis', rides: 25, rating: 4.7, earnings: 780 }
+    ],
+    userGrowth: [2100, 2250, 2380, 2450, 2567]
+  });
+});
+
+app.get('/api/settings', (req, res) => {
+  res.json({
+    surgeMultiplier: 1.5,
+    baseFare: 2.50,
+    perKmRate: 1.20,
+    commissionRate: 0.15,
+    maxWaitTime: 300,
+    cancellationFee: 5.00
+  });
+});
+
+app.post('/api/settings', (req, res) => {
+  // In a real app, save to database
+  res.json({ success: true, message: 'Settings updated successfully' });
+});
+
+// Driver actions
+app.post('/api/drivers/:id/approve', (req, res) => {
+  res.json({ success: true, message: 'Driver approved successfully' });
+});
+
+app.post('/api/drivers/:id/suspend', (req, res) => {
+  res.json({ success: true, message: 'Driver suspended successfully' });
+});
+
+app.delete('/api/drivers/:id', (req, res) => {
+  res.json({ success: true, message: 'Driver deleted successfully' });
+});
+
+// User actions
+app.post('/api/users/:id/suspend', (req, res) => {
+  res.json({ success: true, message: 'User suspended successfully' });
+});
+
+app.delete('/api/users/:id', (req, res) => {
+  res.json({ success: true, message: 'User deleted successfully' });
+});
+
+// Ride actions
+app.post('/api/rides/:id/cancel', (req, res) => {
+  res.json({ success: true, message: 'Ride cancelled successfully' });
 });
 
 // Error handling
