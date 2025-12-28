@@ -210,8 +210,8 @@ app.post('/api/rides', async (req, res) => {
 // Get rides
 app.get('/api/rides', async (req, res) => {
   try {
-    const rides = await Ride.findActiveRides();
-    res.json(rides);
+    const result = await query('SELECT * FROM rides ORDER BY created_at DESC LIMIT 50');
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -231,8 +231,8 @@ app.post('/api/drivers/status', async (req, res) => {
 // Get available rides for drivers
 app.get('/api/rides/available', async (req, res) => {
   try {
-    const rides = await Ride.findActiveRides();
-    res.json(rides);
+    const result = await query("SELECT * FROM rides WHERE status = 'searching' ORDER BY created_at DESC");
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -242,8 +242,16 @@ app.get('/api/rides/available', async (req, res) => {
 app.post('/api/drivers/nearby', async (req, res) => {
   try {
     const { latitude, longitude, radius = 10 } = req.body;
-    const drivers = await DriverProfile.findNearbyDrivers(latitude, longitude, radius);
-    res.json(drivers);
+    const result = await query(`
+      SELECT dp.*, u.full_name, u.rating 
+      FROM driver_profiles dp
+      JOIN users u ON dp.user_id = u.id
+      WHERE dp.is_online = true AND dp.is_available = true
+      AND dp.current_latitude IS NOT NULL AND dp.current_longitude IS NOT NULL
+      ORDER BY dp.last_location_update DESC
+      LIMIT 20
+    `);
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -407,8 +415,8 @@ app.post('/api/notifications/send', authenticateToken, asyncHandler(async (req, 
 // Get user notifications
 app.get('/api/notifications', authenticateToken, asyncHandler(async (req, res) => {
   try {
-    const notifications = await Notification.findByUserId(req.user.id);
-    res.json(notifications);
+    const result = await query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50', [req.user.id]);
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -418,7 +426,7 @@ app.get('/api/notifications', authenticateToken, asyncHandler(async (req, res) =
 app.put('/api/notifications/:id/read', authenticateToken, asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    await Notification.markAsRead(id);
+    await query('UPDATE notifications SET is_read = true WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error) {
     res.status(400).json({ error: error.message });
